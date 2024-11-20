@@ -1,0 +1,31 @@
+{
+  "name": "adam-debrouwere-capstone-booktale-server",
+  "version": "1.0.0",
+  "description": "A server to host a db that contains user information, book information, qr code information, and book comment information",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "migrate": "knex migrate:latest",
+    "seed": "knex seed:run",
+    "dbsetup": "knex migrate:latest && knex seed:run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adamdebrouwere/adam-debrouwere-capstone-bookstory-server.git"
+  },
+  "author": "Adam DeBrouwere",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/adamdebrouwere/adam-debrouwere-capstone-bookstory-server/issues"
+  },
+  "homepage": "https://github.com/adamdebrouwere/adam-debrouwere-capstone-bookstory-server#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "knex": "^3.1.0"
+  }
+}
