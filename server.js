@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import knex from "knex";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import bcrypt from "bcrypt"; // Import bcrypt for password hashing
+import bcrypt from "bcrypt"; 
 
 import configuration from "./knexfile.js";
 const db = knex(configuration);
@@ -13,7 +13,6 @@ dotenv.config();
 const app = express();
 
 const { SECRET_KEY, PORT } = process.env;
-console.log(SECRET_KEY)
 
 app.use(cors());
 app.use(express.json());
@@ -36,6 +35,41 @@ const authenticateUser = (req, res, next) => {
   });
 };
 
+app.post("/signup", async (req, res) => {
+    const { username, email, password } = req.body;
+  
+    if (!username || !email || !password) {
+      return res
+        .status(400)
+        .json({ error: "All fields (username, email, password) are required." });
+    }
+  
+    try {
+      const existingUser = await db("users").where({ email }).first();
+      if (existingUser) {
+        return res.status(400).json({ error: "Email is already registered." });
+      }
+  
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+  
+      const [newUser] = await db("users")
+        .insert({ username, email, password: hashedPassword })
+        .returning(["id", "username", "email"]);
+      res.status(201).json({
+        message: "User created successfully!",
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+        },
+      });
+    } catch (error) {
+      console.error("Error during sign-up:", error);
+      res.status(500).json({ error: "Server error. Please try again later." });
+    }
+  });
+
 app.post("/login", async (req, res) => {
     const { username, password } = req.body;
     
@@ -51,9 +85,9 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Authentication failed: User not found" });
     }
 
-
-    const isPasswordValid = "hashedpassword1" /*await bcrypt.compare(password, user.password)*/;
-    if (password !== user.password) {
+    console.log(user)
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       return res.status(401).json({ error: "Invalid password" });
     }
 
@@ -72,9 +106,14 @@ app.post("/login", async (req, res) => {
 
 app.get("/user", authenticateUser, (req, res) => {
     const authenticatedUser = req.user;
-    console.log(authenticatedUser)
-    res.json({ user: { id: authenticatedUser.id, username: 'john_doe', password: 'hashedpassword1' } });
-});
+
+    res.json({
+      user: {
+        id: authenticatedUser.userId,
+        username: authenticatedUser.userName,
+      }
+    });
+  });
 
 
 
