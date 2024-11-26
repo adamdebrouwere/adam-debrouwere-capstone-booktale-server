@@ -3,8 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import knex from "knex";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
-import bcrypt from "bcrypt"; 
+import bcrypt from "bcrypt";
+import { v4 as uuidv4 } from "uuid";
 
 import configuration from "./knexfile.js";
 const db = knex(configuration);
@@ -19,7 +19,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const authenticateUser = (req, res, next) => {
-  const token = req.headers['authorization']?.split(" ")[1];
+  const token = req.headers["authorization"]?.split(" ")[1];
 
   if (!token) {
     return res.status(401).json({ error: "No JWT token provided" });
@@ -27,7 +27,7 @@ const authenticateUser = (req, res, next) => {
 
   jwt.verify(token, SECRET_KEY, (error, user) => {
     if (error) {
-        console.log(token, SECRET_KEY)
+      console.log(token, SECRET_KEY);
       return res.status(498).json({ error: "Token is invalid or expired" });
     }
     req.user = user;
@@ -36,56 +36,53 @@ const authenticateUser = (req, res, next) => {
 };
 
 app.post("/signup", async (req, res) => {
-    const { username, email, password } = req.body;
-  
-    if (!username || !email || !password) {
-      return res
-        .status(400)
-        .json({ error: "All fields (username, email, password) are required." });
-    }
-  
-    try {
-      const existingUser = await db("users").where({ email }).first();
-      if (existingUser) {
-        return res.status(400).json({ error: "Email is already registered." });
-      }
-  
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-  
-      const [newUser] = await db("users")
-        .insert({ username, email, password: hashedPassword })
-        .returning(["id", "username", "email"]);
-      res.status(201).json({
-        message: "User created successfully!",
-        user: {
-          id: newUser.id,
-          username: newUser.username,
-          email: newUser.email,
-        },
-      });
-    } catch (error) {
-      console.error("Error during sign-up:", error);
-      res.status(500).json({ error: "Server error. Please try again later." });
-    }
-  });
+  const { username, email, password } = req.body;
 
-app.post("/login", async (req, res) => {
-    const { username, password } = req.body;
-    
-    if (!username || !password){
-        return res.status(400).send('Username and password are required')
-    }
+  if (!username || !email || !password) {
+    return res
+      .status(400)
+      .json({ error: "All fields (username, email, password) are required." });
+  }
 
   try {
-    const user = await db("users")
-      .where({ username })
-      .first()
-    if (!user) {
-      return res.status(401).json({ error: "Authentication failed: User not found" });
+    const existingUser = await db("users").where({ email }).first();
+    if (existingUser) {
+      return res.status(400).json({ error: "Email is already registered." });
     }
 
-    console.log(user)
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const [newUser] = await db("users")
+      .insert({ username, email, password: hashedPassword })
+      .returning(["id", "username", "email"]);
+    res.status(201).json({
+      message: "User created successfully!",
+      user: {
+        id: uuidv4(),
+        username: newUser.username,
+        email: newUser.email,
+      },
+    });
+  } catch (error) {
+    console.error("Error during sign-up:", error);
+    res.status(500).json({ error: "Server error. Please try again later." });
+  }
+});
+
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).send("Username and password are required");
+  }
+
+  try {
+    const user = await db("users").where({ username }).first();
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: "Invalid password" });
@@ -100,78 +97,117 @@ app.post("/login", async (req, res) => {
     res.json({ token });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error when creating user" });
   }
 });
 
 app.get("/user", authenticateUser, (req, res) => {
-    const authenticatedUser = req.user;
+  const authenticatedUser = req.user;
 
-    res.json({
-      user: {
-        id: authenticatedUser.userId,
-        username: authenticatedUser.userName,
+  res.json({
+    user: {
+      id: authenticatedUser.userId,
+      username: authenticatedUser.userName,
+    },
+  });
+});
+
+app.post("/booktale", authenticateUser, async (req, res) => {
+  const { title, author, qrCodeUrl, coverUrl, qrCodeId } = req.body;
+
+  if (!title || !qrCodeUrl || !qrCodeId) {
+    return res.status(400).json({ error: "Missing title or qr code" });
+  }
+  // console.log(title, author, qrCodeUrl, coverUrl, qrCodeId)
+
+  try {
+    const userId = req.user.userId;
+    console.log("trigge1")
+
+    const [bookQrCode] = await db("book_qr_codes").insert(
+      {
+        qr_code_id: qrCodeId,
+        qr_code_url: qrCodeUrl,
+        title: title,
+        author: author[0],
+        cover_url: coverUrl || null,
       }
+    ).returning("id");
+    console.log("trigge2")
+    
+
+    await db("user_books").insert({
+      user_id: userId,
+      book_qr_code_id: bookQrCode.id,
     });
-  });
+
+    res.status(201).json({ message: "Booktale created!" });
+  } catch (error) {
+    console.error("Error creating booktale:", error);
+    res.status(500).json({ error: "Server error when creating booktale" });
+  }
+});
+
+app.post("/access-qr", authenticateUser, (req, res) => {
+  const { qrToken, userId } = req.body;
+
+  if (!qrCodes[qrToken]) {
+    return res.status(404).json({ error: "QR Code not found" });
+  }
+
+  if (
+    qrCodes[qrToken].comments.some(
+      (comment) => comment.userId === req.user.userId
+    )
+  ) {
+    return res.status(400).json({ error: "User has already commented" });
+  }
+
+  res.send("You can now comment.");
+});
 
 
+app.post("/comments/:bookId", authenticateUser, async (req, res) => {
+  const { bookId } = req.params;
+  const { comment } = req.body;
+  const { userId } = req.user;
 
-const generateQrToken = () => {
-    return crypto.randomBytes(16).toString("hex");
-  };
-  
-  app.post("/generate-qr", (req, res) => {
-    const qrToken = generateQrToken();
-    // store qrToken in database instead of memory 
-    qrCodes[qrToken] = { comments: [] };
-    res.json({ qrToken });
-  });
-  
-  app.post("/access-qr", authenticateUser, (req, res) => {
-    const { qrToken } = req.body;
-  
-    if (!qrCodes[qrToken]) {
-      return res.status(404).json({ error: "QR Code not found" });
+  if (!comment || comment.trim() === "") {
+    return res.status(400).json({ error: "empty comment" });
+  }
+
+  try {
+    const book = await knex("book_qr_codes").where({ id: bookId }).first();
+
+    if (!book) {
+      return res.status(404).json({ error: "no book found" });
     }
-  
-    if (qrCodes[qrToken].comments.some(comment => comment.userId === req.user.userId)) {
+    const commented = await knex("comments")
+      .where({ book_qr_code_id: bookId, user_id: userId })
+      .first();
+
+    if (commented) {
       return res.status(400).json({ error: "User has already commented" });
     }
-  
-    res.send("You can now comment.");
-  });
-  
-  app.get("/comments", authenticateUser, (req, res) => {
-    const { qrToken } = req.query;
-  
-    if (!qrToken || !qrCodes[qrToken]) {
-      return res.status(404).json({ error: "QR Code not found" });
-    }
-  
-    res.json({ comments: qrCodes[qrToken].comments });
-  });
-  
-  app.post("/comments", authenticateUser, (req, res) => {
-    const { qrToken, comment } = req.body;
-  
-    if (!qrCodes[qrToken]) {
-      return res.status(404).json({ error: "QR Code not found" });
-    }
-  
-    if (qrCodes[qrToken].comments.some(comment => comment.userId === req.user.userId)) {
-      return res.status(400).json({ error: "User has already commented" });
-    }
-  
-    qrCodes[qrToken].comments.push({
-      userId: req.user.userId,
-      comment,
-      timestamp: new Date(),
-    });
-  
-    res.json({ message: "Comment successfully posted" });
-  });
-  
-  app.listen(PORT, () => {
+
+    const newComment = await knex("comments")
+      .insert({
+        book_qr_code_id: bookId,
+        user_id: userId,
+        comment,
+      })
+      .returning("*");
+
+
+    res
+      .status(201)
+      .json({ message: "Comment successfully posted", comment: newComment });
+  } catch (error) {
+    console.error("error posting comment:", error);
+    res.status(500).json({ error: "no comment posted. Try again." });
+  }
+});
+
+app.listen(PORT, () => {
   console.log("Listening on port:", PORT);
 });
