@@ -27,7 +27,6 @@ const authenticateUser = (req, res, next) => {
 
   jwt.verify(token, SECRET_KEY, (error, user) => {
     if (error) {
-      console.log(token, SECRET_KEY);
       return res.status(498).json({ error: "Token is invalid or expired" });
     }
     req.user = user;
@@ -118,27 +117,23 @@ app.post("/booktale", authenticateUser, async (req, res) => {
   if (!title || !qrCodeUrl || !qrCodeId) {
     return res.status(400).json({ error: "Missing title or qr code" });
   }
-  // console.log(title, author, qrCodeUrl, coverUrl, qrCodeId)
 
   try {
     const userId = req.user.userId;
-    console.log("trigge1")
 
-    const [bookQrCode] = await db("book_qr_codes").insert(
-      {
+    const [bookQrCode] = await db("qr_codes")
+      .insert({
         qr_code_id: qrCodeId,
         qr_code_url: qrCodeUrl,
         title: title,
-        author: author[0],
+        author: author,
         cover_url: coverUrl || null,
-      }
-    ).returning("id");
-    console.log("trigge2")
-    
+      })
+      .returning("id");
 
-    await db("user_books").insert({
+    await db("user_qrs").insert({
       user_id: userId,
-      book_qr_code_id: bookQrCode.id,
+      qr_id: bookQrCode.id,
     });
 
     res.status(201).json({ message: "Booktale created!" });
@@ -166,9 +161,35 @@ app.post("/access-qr", authenticateUser, (req, res) => {
   res.send("You can now comment.");
 });
 
+app.get("/booktale/:qr_code_id", async (req, res) => {
+  const { qr_code_id } = req.params;
 
-app.post("/comments/:bookId", authenticateUser, async (req, res) => {
-  const { bookId } = req.params;
+  if (!qr_code_id) {
+    return res.status(400).json({ error: "no id" });
+  }
+
+  try {
+    const getQrId = await db("qr_codes")
+      .select("id")
+      .where({ qr_code_id: qr_code_id })
+      .first();
+    console.log(getQrId);
+    if (!getQrId) {
+      res.status(400).json({ error: "No Qr Code Present" });
+    }
+
+    const comments = await db("comments").where({ qr_id: getQrId.id });
+    res.status(200).json({ comments });
+  } catch (error) {
+    console.error("error getting comments", error);
+    res
+      .status(500)
+      .json({ error: "no booktale created with this id. Try again." });
+  }
+});
+
+app.post("/booktale/:qr_code_id", authenticateUser, async (req, res) => {
+  const { qr_code_id } = req.params;
   const { comment } = req.body;
   const { userId } = req.user;
 
@@ -177,27 +198,29 @@ app.post("/comments/:bookId", authenticateUser, async (req, res) => {
   }
 
   try {
-    const book = await knex("book_qr_codes").where({ id: bookId }).first();
-
-    if (!book) {
-      return res.status(404).json({ error: "no book found" });
+    const qrId = await db("qr_codes")
+      .where({ qr_code_id: qr_code_id })
+      .select("id")
+      .first();
+    if (!qrId) {
+      return res.status(404).json({ error: "no booktale found" });
     }
-    const commented = await knex("comments")
-      .where({ book_qr_code_id: bookId, user_id: userId })
+
+    const commented = await db("comments")
+      .where({ qr_id: qrId.id, user_id: userId })
       .first();
 
     if (commented) {
       return res.status(400).json({ error: "User has already commented" });
     }
 
-    const newComment = await knex("comments")
+    const newComment = await db("comments")
       .insert({
-        book_qr_code_id: bookId,
+        qr_id: qrId.id,
         user_id: userId,
-        comment,
+        comment: comment,
       })
       .returning("*");
-
 
     res
       .status(201)

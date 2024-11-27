@@ -14,13 +14,12 @@ export const up = async (knex) => {
     table.timestamp("updated_at").defaultTo(knex.fn.now());
   });
 
-  await knex.schema.createTable("book_qr_codes", (table) => {
+  await knex.schema.createTable("qr_codes", (table) => {
     table.increments("id").primary();
     table.string("qr_code_id").notNullable();
     table.text("qr_code_url").notNullable();
     table.string("title").notNullable();
     table.string("author").nullable();
-
     table.string("cover_url").nullable();
     table.timestamp("created_at").defaultTo(knex.fn.now());
   });
@@ -28,9 +27,9 @@ export const up = async (knex) => {
   await knex.schema.createTable("comments", (table) => {
     table.increments("id").primary();
     table
-      .integer("book_qr_code_id")
+      .integer("qr_id")
       .references("id")
-      .inTable("book_qr_codes")
+      .inTable("qr_codes")
       .onDelete("CASCADE");
     table
       .integer("user_id")
@@ -42,7 +41,7 @@ export const up = async (knex) => {
     table.timestamp("updated_at").defaultTo(knex.fn.now());
   });
 
-  await knex.schema.createTable("user_books", (table) => {
+  await knex.schema.createTable("user_qrs", (table) => {
     table.increments("id").primary();
     table
       .integer("user_id")
@@ -50,9 +49,9 @@ export const up = async (knex) => {
       .inTable("users")
       .onDelete("CASCADE");
     table
-      .integer("book_qr_code_id")
+      .integer("qr_id")
       .references("id")
-      .inTable("book_qr_codes")
+      .inTable("qr_codes")
       .onDelete("CASCADE");
     table.timestamp("saved_at").defaultTo(knex.fn.now());
   });
@@ -65,8 +64,8 @@ export const up = async (knex) => {
 
 export const down = async (knex) => {
   await knex.schema
-    .dropTableIfExists("user_books")
+    .dropTableIfExists("user_qrs")
     .dropTableIfExists("comments")
-    .dropTableIfExists("book_qr_codes")
+    .dropTableIfExists("qr_codes")
     .dropTableIfExists("users");
 };
