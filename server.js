@@ -48,17 +48,17 @@ app.post("/signup", async (req, res) => {
     if (existingUser) {
       return res.status(400).json({ error: "Email is already registered." });
     }
-
+    const user_id = uuidv4()
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const [newUser] = await db("users")
-      .insert({ username, email, password: hashedPassword })
+      .insert({ user_id, username, email, password: hashedPassword })
       .returning(["id", "username", "email"]);
     res.status(201).json({
       message: "User created successfully!",
       user: {
-        id: uuidv4(),
+        user_id: user_id,
         username: newUser.username,
         email: newUser.email,
       },
@@ -112,7 +112,8 @@ app.get("/user", authenticateUser, (req, res) => {
 });
 
 app.post("/booktale", authenticateUser, async (req, res) => {
-  const { title, author, qrCodeUrl, coverUrl, qrCodeId } = req.body;
+  const { title, author, coverUrl, publishDate, qrCodeUrl, qrCodeId } =
+    req.body;
 
   if (!title || !qrCodeUrl || !qrCodeId) {
     return res.status(400).json({ error: "Missing title or qr code" });
@@ -121,19 +122,26 @@ app.post("/booktale", authenticateUser, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const [bookQrCode] = await db("qr_codes")
+    const [bookInfo] = await db("books")
+      .insert({
+        title: title,
+        author: author,
+        publish_date: publishDate,
+        cover_url: coverUrl || null,
+      })
+      .returning("id");
+
+    const [qrCode] = await db("qr_codes")
       .insert({
         qr_code_id: qrCodeId,
         qr_code_url: qrCodeUrl,
-        title: title,
-        author: author,
-        cover_url: coverUrl || null,
+        book_id: bookInfo.id,
       })
       .returning("id");
 
     await db("user_qrs").insert({
       user_id: userId,
-      qr_id: bookQrCode.id,
+      qr_id: qrCode.id,
     });
 
     res.status(201).json({ message: "Booktale created!" });
@@ -143,23 +151,6 @@ app.post("/booktale", authenticateUser, async (req, res) => {
   }
 });
 
-app.post("/access-qr", authenticateUser, (req, res) => {
-  const { qrToken, userId } = req.body;
-
-  if (!qrCodes[qrToken]) {
-    return res.status(404).json({ error: "QR Code not found" });
-  }
-
-  if (
-    qrCodes[qrToken].comments.some(
-      (comment) => comment.userId === req.user.userId
-    )
-  ) {
-    return res.status(400).json({ error: "User has already commented" });
-  }
-
-  res.send("You can now comment.");
-});
 
 app.get("/booktale/:qr_code_id", async (req, res) => {
   const { qr_code_id } = req.params;
@@ -173,12 +164,13 @@ app.get("/booktale/:qr_code_id", async (req, res) => {
       .select("id")
       .where({ qr_code_id: qr_code_id })
       .first();
-    console.log(getQrId);
     if (!getQrId) {
       res.status(400).json({ error: "No Qr Code Present" });
     }
 
-    const comments = await db("comments").where({ qr_id: getQrId.id });
+    const comments = await db("comments")
+      .where({ qr_id: getQrId.id })
+      .orderBy("created_at", "desc");
     res.status(200).json({ comments });
   } catch (error) {
     console.error("error getting comments", error);
@@ -188,10 +180,24 @@ app.get("/booktale/:qr_code_id", async (req, res) => {
   }
 });
 
+app.get("/bookInfo/:qr_code_id", async (req, res) => {
+  const { qr_code_id } = req.params;
+  try {
+    const getBookInfo = await db("qr_codes")
+    .join("books", "qr_codes.book_id", "books.id")
+      .where("qr_codes.qr_code_id", qr_code_id)
+      .select("books.*")
+      .first();
+    res.status(200).json({ getBookInfo });
+  } catch (error) {
+    console.error("error getting qr data:");
+  }
+});
 app.post("/booktale/:qr_code_id", authenticateUser, async (req, res) => {
   const { qr_code_id } = req.params;
-  const { comment } = req.body;
+  const { comment, location, username } = req.body;
   const { userId } = req.user;
+  console.log(location)
 
   if (!comment || comment.trim() === "") {
     return res.status(400).json({ error: "empty comment" });
@@ -218,7 +224,14 @@ app.post("/booktale/:qr_code_id", authenticateUser, async (req, res) => {
       .insert({
         qr_id: qrId.id,
         user_id: userId,
+        username: username,
         comment: comment,
+        longitude: location.longitude,
+        latitude: location.latitude,
+        heading: location.heading,
+        city: location.city,
+        state: location.state,
+        country: location.country,
       })
       .returning("*");
 
