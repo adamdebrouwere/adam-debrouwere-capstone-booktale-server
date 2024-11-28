@@ -34,6 +34,11 @@ const authenticateUser = (req, res, next) => {
   });
 };
 
+app.get("/authenticated", authenticateUser, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json({ message: "User Authenticated", user: req.user })
+})
+
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
 
@@ -65,7 +70,7 @@ app.post("/signup", async (req, res) => {
     });
   } catch (error) {
     console.error("Error during sign-up:", error);
-    res.status(500).json({ error: "Server error. Please try again later." });
+    res.status(500).json({ error: "duplicate username, email, or password not vaild" });
   }
 });
 
