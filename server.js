@@ -29,10 +29,35 @@ const authenticateUser = (req, res, next) => {
     if (error) {
       return res.status(498).json({ error: "Token is invalid or expired" });
     }
+    
     req.user = user;
     next();
   });
 };
+
+app.get("/pastTales/:user_id", async (req, res) => {
+const user_id = req.params
+
+if (!user_id) {
+  return res.status(400).json({ message: "No User ID"})
+}
+
+try {
+  const user_books = await db('comments')
+  .join('qr_codes', 'comments.qr_id', '=', 'qr_codes.id')
+  .join('books', 'qr_codes.book_id', '=', 'books.id')
+  .where('comments.user_id', '=', user_id.user_id) 
+  .select('books.*',
+    'comments.comment', 'qr_codes.qr_code_id'
+  ) 
+  .orderBy('books.created_at')
+
+  res.status(200).json({ user_books })
+} catch (error) {
+  console.error("Error during comment retrieval:", error);
+    res.status(500).json({ error: "comment retrieval" });
+}
+})
 
 app.get("/authenticated", authenticateUser, (req, res) => {
   res.set('Cache-Control', 'no-store');
