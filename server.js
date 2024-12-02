@@ -48,7 +48,7 @@ app.get("/pastTales/:user_id", async (req, res) => {
       .join("books", "qr_codes.book_id", "=", "books.id")
       .where("comments.user_id", "=", user_id.user_id)
       .select("books.*", "comments.comment", "qr_codes.qr_code_id")
-      .orderBy("books.created_at");
+      .orderBy("books.created_at" ,"desc");
 
     res.status(200).json({ user_books });
   } catch (error) {
@@ -242,6 +242,7 @@ app.get("/bookInfo/:qr_code_id", async (req, res) => {
     console.error("error getting qr data:");
   }
 });
+
 app.post("/booktale/:qr_code_id", authenticateUser, async (req, res) => {
   const { qr_code_id } = req.params;
   const { comment, location, username } = req.body;
