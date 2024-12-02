@@ -29,56 +29,74 @@ const authenticateUser = (req, res, next) => {
     if (error) {
       return res.status(498).json({ error: "Token is invalid or expired" });
     }
-    
+
     req.user = user;
     next();
   });
 };
 
 app.get("/pastTales/:user_id", async (req, res) => {
-const user_id = req.params
+  const user_id = req.params;
 
-if (!user_id) {
-  return res.status(400).json({ message: "No User ID"})
-}
+  if (!user_id) {
+    return res.status(400).json({ message: "No User ID" });
+  }
 
-try {
-  const user_books = await db('comments')
-  .join('qr_codes', 'comments.qr_id', '=', 'qr_codes.id')
-  .join('books', 'qr_codes.book_id', '=', 'books.id')
-  .where('comments.user_id', '=', user_id.user_id) 
-  .select('books.*',
-    'comments.comment', 'qr_codes.qr_code_id'
-  ) 
-  .orderBy('books.created_at')
+  try {
+    const user_books = await db("comments")
+      .join("qr_codes", "comments.qr_id", "=", "qr_codes.id")
+      .join("books", "qr_codes.book_id", "=", "books.id")
+      .where("comments.user_id", "=", user_id.user_id)
+      .select("books.*", "comments.comment", "qr_codes.qr_code_id")
+      .orderBy("books.created_at");
 
-  res.status(200).json({ user_books })
-} catch (error) {
-  console.error("Error during comment retrieval:", error);
+    res.status(200).json({ user_books });
+  } catch (error) {
+    console.error("Error during comment retrieval:", error);
     res.status(500).json({ error: "comment retrieval" });
-}
-})
+  }
+});
 
 app.get("/authenticated", authenticateUser, (req, res) => {
-  res.set('Cache-Control', 'no-store');
-  res.status(200).json({ message: "User Authenticated", user: req.user })
-})
+  res.set("Cache-Control", "no-store");
+  res.status(200).json({ message: "User Authenticated", user: req.user });
+});
 
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+
   if (!username || !email || !password) {
+    return res.status(400).json({
+      error: "All fields are required.",
+    });
+  }
+
+  if (!emailRegex.test(email)) {
     return res
       .status(400)
-      .json({ error: "All fields (username, email, password) are required." });
+      .json({ error: "Please enter a valid email address." });
+  }
+
+  if (!passwordRegex.test(password)) {
+    return res.status(400).json({
+      error:
+        "Password must be at least 8 characters long and contain a lowercase letter, an uppercase letter, a number, and a special character.",
+    });
   }
 
   try {
     const existingUser = await db("users").where({ email }).first();
+    
     if (existingUser) {
       return res.status(400).json({ error: "Email is already registered." });
     }
-    const user_id = uuidv4()
+    
+    const user_id = uuidv4();
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -95,7 +113,9 @@ app.post("/signup", async (req, res) => {
     });
   } catch (error) {
     console.error("Error during sign-up:", error);
-    res.status(500).json({ error: "duplicate username, email, or password not vaild" });
+    res
+      .status(500)
+      .json({ error: "duplicate username, email, or password not vaild" });
   }
 });
 
@@ -181,7 +201,6 @@ app.post("/booktale", authenticateUser, async (req, res) => {
   }
 });
 
-
 app.get("/booktale/:qr_code_id", async (req, res) => {
   const { qr_code_id } = req.params;
 
@@ -214,7 +233,7 @@ app.get("/bookInfo/:qr_code_id", async (req, res) => {
   const { qr_code_id } = req.params;
   try {
     const getBookInfo = await db("qr_codes")
-    .join("books", "qr_codes.book_id", "books.id")
+      .join("books", "qr_codes.book_id", "books.id")
       .where("qr_codes.qr_code_id", qr_code_id)
       .select("books.*")
       .first();
@@ -227,7 +246,7 @@ app.post("/booktale/:qr_code_id", authenticateUser, async (req, res) => {
   const { qr_code_id } = req.params;
   const { comment, location, username } = req.body;
   const { userId } = req.user;
-  console.log(location)
+  console.log(location);
 
   if (!comment || comment.trim() === "") {
     return res.status(400).json({ error: "empty comment" });
