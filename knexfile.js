@@ -1,11 +1,14 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import "dotenv/config";
 
 export default {
-  client: 'pg',
-  connection: process.env.PG_CONNECTION_STRING,
-  searchPath: ['knex', 'public'],
-  pool: { min: 2, max: 10 },
-  debug: true, 
+  client: "pg",
+  connection: {
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
+    port: 5432,
+    ssl: true,
+  },
 };
 
