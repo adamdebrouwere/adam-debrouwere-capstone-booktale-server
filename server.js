@@ -68,7 +68,7 @@ app.post("/signup", async (req, res) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const passwordRegex =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
   if (!username || !email || !password) {
     return res.status(400).json({
@@ -85,7 +85,7 @@ app.post("/signup", async (req, res) => {
   if (!passwordRegex.test(password)) {
     return res.status(400).json({
       error:
-        "Password must be at least 8 characters long and contain a lowercase letter, an uppercase letter, a number, and a special character.",
+        "Password must be at least 8 characters long and contain a lowercase letter, an uppercase letter, and a number.",
     });
   }
 
