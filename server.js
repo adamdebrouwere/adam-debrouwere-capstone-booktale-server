@@ -47,7 +47,7 @@ app.get("/pastTales/:user_id", async (req, res) => {
       .join("qr_codes", "comments.qr_id", "=", "qr_codes.id")
       .join("books", "qr_codes.book_id", "=", "books.id")
       .where("comments.user_id", "=", user_id.user_id)
-      .select("books.*", "comments.comment", "qr_codes.qr_code_id")
+      .select("books.*", "comments.*", "comments.created_at as comment_created_at", "qr_codes.qr_code_id")
       .orderBy("books.created_at" ,"desc");
 
     res.status(200).json({ user_books });
