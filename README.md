@@ -1,6 +1,6 @@
 # Booktale Server
 
-deployed at [booktale](booktale.netlify.app)
+deployed at [Booktale](booktale.netlify.app)
 
 ### Install dependencies
 npm install
