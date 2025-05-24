@@ -2,6 +2,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import db from "../config/db.js";
+import dotenv from "dotenv"
+
+dotenv.config()
 
 
 export const userAuthenticated = async (req, res) => {

@@ -1,0 +1,28 @@
+name: Deploy Booktale Server
+
+on:
+  push:
+    branches:
+      - main  
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup SSH agent with private key
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.BOOKTALE_SERVER }}
+
+    - name: Deploy to VPS
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.BOOKTALE_VPS_USER  }}@${{ secrets.BOOKTALE_VPS_HOST }} << EOF
+          cd ${{ secrets.BOOKTALE_DEPLOY_PATH }}
+          git pull origin main
+          npm install
+          pm2 reload all || pm2 start index.js --name "booktale-server"
+        EOF
