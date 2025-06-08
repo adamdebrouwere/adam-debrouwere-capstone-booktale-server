@@ -8,7 +8,7 @@ import authenticateUser from "./middleware/authenticateUser.js";
 
 dotenv.config();
 const app = express();
-const { PORT } = process.env;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -19,10 +19,9 @@ app.use("/auth", authRoutes);
 app.use("/user", authenticateUser, userRoutes);
 app.use("/tales", talesRoutes);
 
-app.get('/', (req, res) => {
-  res.send('Hello from Booktale server!');
+app.get("/", (req, res) => {
+  res.send("Hello from Booktale server!");
 });
-
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
